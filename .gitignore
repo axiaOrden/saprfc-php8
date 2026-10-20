@@ -54,3 +54,6 @@ run-tests.php
 test_sap_connection.php
 test_sap_rfc.php
 test_sap_read_table.php
+
+# Local SAP configuration
+.sap.env
