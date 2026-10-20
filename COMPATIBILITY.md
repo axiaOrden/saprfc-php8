@@ -1,7 +1,9 @@
 # PHP 8 porting notes and compatibility
 
 Original: SAPRFC 1.4.1 (2005), PHP 4/5 Zend API, classic SAP RFCSDK 6.20/6.40.
-Ported: SAPRFC 1.4.2-php8, Zend Engine 4.x (PHP 8.3 / 8.4 / 8.5), same SDK.
+Ported: SAPRFC 1.4.2-php8, Zend Engine 4.x, same SDK. PHP 8.3.35 NTS
+(API 20230831) and PHP 8.5.10 NTS (API 20250925) are verified. PHP 8.4 is
+source-compatible by design but has not been separately verified.
 
 ## Public PHP API is preserved
 

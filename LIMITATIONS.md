@@ -8,14 +8,17 @@ This port was built and tested on:
 - PHP 8.3.35 NTS (`php-legacy`), Zend Engine 4.3.35
 - PHP 8.5.10 NTS, Zend Engine 4.5.10
 
-No classic SAP RFCSDK installation and no SAP ECC system were available on the
-build host. Therefore:
+Offline builds and the automated PHPT suite use the test-only mock SDK. In
+addition, v1.4.2 has reported integration verification against SAP ECC using
+the licensed classic SDK for `RFC_SYSTEM_INFO`, `RFC_READ_TABLE`, and the Sales
+District Viewer. Therefore:
 
-- **Compilation against the real SAP headers was not performed here.** The
-  extension was compiled against the test-only mock headers in
-  `tests/mock_rfcsdk`, which reproduce the API surface used by SAPRFC 1.4.1.
-- **No real SAP connection, function call, Unicode conversation, server
-  registration, or tRFC exchange was tested.**
+- The repository's repeatable tests compile against the mock headers in
+  `tests/mock_rfcsdk`; they do not prove compatibility with every proprietary
+  SDK 6.40 build.
+- The reported live verification is limited to the client calls listed above.
+  No Unicode edge-case matrix, server registration, or tRFC exchange was
+  reported as tested.
 - The mock RFCSDK is not the SAP SDK. Do not ship it or point a production
   build at it. `config.m4` prints a warning when it detects the mock.
 
@@ -30,6 +33,10 @@ with a specific `librfccm.so` build.
   does **not** use the NetWeaver RFC SDK 7.50 API (`sapnwrfc.h`,
   `libsapnwrfc.so`). Pointing `--with-saprfc` at NW RFC 7.50 will fail because
   `saprfc.h` is absent.
+- SAP's classic SDK is proprietary and is not redistributed here. Many Linux
+  builds depend on the obsolete `libstdc++.so.5`; operators must obtain an
+  approved, architecture-matching compatibility runtime and configure the
+  dynamic linker themselves.
 - The classic SDK has both non-Unicode and Unicode variants. Unicode support is
   only as good as the installed `librfccm` and the remote ECC release.
 - The port preserves 1.4.1's discovery logic:
@@ -97,6 +104,14 @@ with a specific `librfccm.so` build.
 - PHP exceptions raised inside user callbacks during server dispatch are
   converted into an RFC failure/abort; the PHP exception itself is not
   propagated back through the SDK boundary.
+- The historical browser examples, including `saprfc_test.php`, predate modern
+  output escaping, CSRF protection, and secret-handling expectations. They are
+  reference material only and must not be exposed unchanged. The Sales
+  District Viewer is safer, but still requires access control, TLS, a
+  least-privilege SAP user, `APP_DEBUG=false`, and SAP tracing disabled.
+- `config/bootstrap.php` is not a full dotenv parser or secret manager. It does
+  not support interpolation, escapes, multiline values, `export`, inline
+  comments, or variable expansion, and it does not enforce file permissions.
 
 ## Build/tooling limits
 

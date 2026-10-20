@@ -9,11 +9,19 @@ SAP RFC SDK** (`librfccm`), not the NetWeaver RFC SDK 7.50.
 - Linux x86_64 (the SDK and PHP must use the same word size)
 - PHP 8.3 NTS with development headers
 - `phpize`, `php-config`, a C compiler, `make`, `autoconf`
+- the matching numeric PHP API in the runtime, development headers, and
+  `phpize` (Arch's `php-config` does not implement `--phpapi`)
 - The classic SAP RFCSDK 6.20/6.40 with:
   - `include/saprfc.h`
   - `include/sapitab.h`
   - `include/rfcsi.h`
   - `lib/librfccm.so` (or `lib64/librfccm.so`, or `librfc.so`/`librfc.a`)
+- for SDK builds linked against it, an architecture-matching legacy
+  `libstdc++.so.5` compatibility library
+
+The classic SDK is proprietary SAP software and is not included. Acquire it
+and any required compatibility runtime through authorized channels. Never
+commit or redistribute those binaries with this repository.
 
 On Arch/CachyOS the PHP 8.3 toolchain is packaged as `php-legacy`:
 
@@ -28,6 +36,16 @@ Confirm that PHP is NTS:
 php-legacy -i | grep -i "Thread Safety"
 # Thread Safety => disabled
 ```
+
+Validate the selected runtime and development tools before building:
+
+```bash
+scripts/doctor.sh --php php-legacy \
+  --php-config php-config-legacy --sdk /opt/rfcsdk
+```
+
+The scripts determine the runtime API from `php -i` and the development API
+from `Zend/zend_modules.h`; they do not call unsupported `php-config --phpapi`.
 
 ## Build against the real classic RFCSDK
 
@@ -49,13 +67,17 @@ elsewhere:
             --with-saprfc=/path/to/rfcsdk
 ```
 
-`config.m4` adds an rpath for the selected SDK library directory, so the built
-`modules/saprfc.so` normally finds `librfccm.so` without `LD_LIBRARY_PATH`.
-If your loader still cannot find it:
+`config.m4` adds an rpath for the selected SDK library directory. It does not
+necessarily cover a separate `libstdc++.so.5` compatibility directory. For a
+system installation, add approved directories to a dedicated file such as
+`/etc/ld.so.conf.d/saprfc.conf` and run `sudo ldconfig`. For a temporary test:
 
 ```bash
-export LD_LIBRARY_PATH=/opt/rfcsdk/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/opt/rfcsdk/lib:/opt/saprfc-compat/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+ldd modules/saprfc.so
 ```
+
+Do not use an untrusted compatibility library or commit it to this repository.
 
 ## Verify that the extension loads
 
@@ -150,4 +172,6 @@ installing.
 | `Cannot find librfccm.so` | SDK library is in `lib64` or the wrong architecture; install the 64-bit SDK. |
 | `undefined symbol: Rfc...` at load time | Extension was built against one SDK and loaded with another; rebuild against the target SDK. |
 | `saprfc.so: cannot open shared object file` | Add the SDK library directory to `LD_LIBRARY_PATH` or fix the rpath. |
+| `libstdc++.so.5: cannot open shared object file` | Install an approved legacy compatibility runtime and configure its directory with `ldconfig` or a scoped service environment. |
+| `Module compiled with module API=...` | The PHP binary, `php-config`, and `phpize` do not match; run `scripts/doctor.sh` and rebuild. |
 | Configure warns about `SAPRFC_MOCK_SDK` | You selected the test double; it cannot connect to SAP. Use the real SDK path. |

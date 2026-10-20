@@ -5,8 +5,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 PHP_CONFIG="${PHP_CONFIG:-php-config}"
 PHPIZE="${PHPIZE:-}"
-SAPRFC_SDK_PATH="${SAPRFC_SDK_PATH:-$HOME/App/sdk/rfcsdk}"
-SAPRFC_COMPAT_LIB="${SAPRFC_COMPAT_LIB:-$HOME/App/sdk/compat/lib}"
+SAPRFC_SDK_PATH="${SAPRFC_SDK_PATH:-/opt/rfcsdk}"
+SAPRFC_COMPAT_LIB="${SAPRFC_COMPAT_LIB:-}"
 
 usage() {
     echo "Usage: $0 [--php-config PATH] [--phpize PATH] [--sdk PATH]"
@@ -43,10 +43,22 @@ PHPIZE="$(command -v "$PHPIZE")" || {
 VERSION="$("$PHP_CONFIG" --version)"
 PHP_BINARY="$("$PHP_CONFIG" --php-binary)"
 PHP_API="$("$PHPIZE" -v | sed -n 's/^PHP Api Version:[[:space:]]*//p' | head -1)"
+RUNTIME_VERSION="$($PHP_BINARY -r 'echo PHP_VERSION;' 2>/dev/null || true)"
+RUNTIME_API="$($PHP_BINARY -i 2>/dev/null | sed -n 's/^PHP API => \([0-9][0-9]*\)$/\1/p' | head -1)"
+INCLUDE_DIR="$("$PHP_CONFIG" --include-dir)"
+CONFIG_API="$(sed -n 's/^#define ZEND_MODULE_API_NO[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$INCLUDE_DIR/Zend/zend_modules.h" 2>/dev/null | head -1)"
 PHP_MINOR="$(printf '%s\n' "$VERSION" | cut -d. -f1,2)"
 
-if [[ -z "$PHP_API" ]]; then
-    echo "Unable to determine PHP API" >&2
+if [[ ! "$PHP_API" =~ ^[0-9]+$ || ! "$RUNTIME_API" =~ ^[0-9]+$ || ! "$CONFIG_API" =~ ^[0-9]+$ ]]; then
+    echo "Unable to determine a numeric PHP API from phpize, PHP, and development headers." >&2
+    exit 1
+fi
+
+if [[ "$VERSION" != "$RUNTIME_VERSION" || "$PHP_API" != "$RUNTIME_API" || "$PHP_API" != "$CONFIG_API" ]]; then
+    echo "PHP toolchain mismatch:" >&2
+    echo "  php-config: version $VERSION, API $CONFIG_API" >&2
+    echo "  PHP binary: version $RUNTIME_VERSION, API $RUNTIME_API ($PHP_BINARY)" >&2
+    echo "  phpize:     API $PHP_API ($PHPIZE)" >&2
     exit 1
 fi
 
@@ -55,8 +67,15 @@ if [[ ! -f "$SAPRFC_SDK_PATH/include/saprfc.h" ]]; then
     exit 1
 fi
 
-if [[ ! -f "$SAPRFC_SDK_PATH/lib/librfccm.so" ]]; then
-    echo "SAP RFC SDK library not found: $SAPRFC_SDK_PATH/lib/librfccm.so" >&2
+SAPRFC_LIB_DIR=""
+for candidate in "$SAPRFC_SDK_PATH/lib" "$SAPRFC_SDK_PATH/lib64"; do
+    if [[ -f "$candidate/librfccm.so" || -f "$candidate/librfc.so" || -f "$candidate/librfc.a" ]]; then
+        SAPRFC_LIB_DIR="$candidate"
+        break
+    fi
+done
+if [[ -z "$SAPRFC_LIB_DIR" ]]; then
+    echo "SAP RFC SDK library (librfccm or librfc) not found under $SAPRFC_SDK_PATH/lib or lib64" >&2
     exit 1
 fi
 
@@ -101,13 +120,15 @@ echo "Build output: $OUTPUT/saprfc.so"
 echo
 echo "Checking dependencies:"
 
-LD_LIBRARY_PATH="$SAPRFC_COMPAT_LIB:$SAPRFC_SDK_PATH/lib:${LD_LIBRARY_PATH:-}" \
+RUNTIME_LIBRARY_PATH="$SAPRFC_LIB_DIR${SAPRFC_COMPAT_LIB:+:$SAPRFC_COMPAT_LIB}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+LD_LIBRARY_PATH="$RUNTIME_LIBRARY_PATH" \
     ldd "$OUTPUT/saprfc.so"
 
 echo
 echo "Checking extension loading:"
 
-LD_LIBRARY_PATH="$SAPRFC_COMPAT_LIB:$SAPRFC_SDK_PATH/lib:${LD_LIBRARY_PATH:-}" \
+LD_LIBRARY_PATH="$RUNTIME_LIBRARY_PATH" \
     "$PHP_BINARY" -n \
     -d "extension=$OUTPUT/saprfc.so" \
     --ri saprfc

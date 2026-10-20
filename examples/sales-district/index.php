@@ -17,6 +17,7 @@ $districts = [];
 $error = null;
 $rfc = null;
 $connection = null;
+$debug = filter_var(envValue('APP_DEBUG', 'false'), FILTER_VALIDATE_BOOLEAN);
 
 try {
     if (!extension_loaded('saprfc')) {
@@ -91,7 +92,10 @@ try {
     }
 
 } catch (Throwable $e) {
-    $error = $e->getMessage();
+    error_log('Sales District Viewer: ' . str_replace(["\r", "\n"], ' ', $e->getMessage()));
+    $error = $debug
+        ? $e->getMessage()
+        : 'Unable to retrieve sales districts. Check the server log for details.';
 } finally {
     if ($rfc) {
         saprfc_function_free($rfc);
