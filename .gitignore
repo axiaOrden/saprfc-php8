@@ -1,0 +1,56 @@
+# Credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# SAP RFC traces and logs
+*.trc
+*.log
+dev_rfc.trc
+
+# SAP SDK binaries
+rfcsdk/
+sdk/
+compat/
+librfccm.so
+librfc.a
+libstdc++.so.5*
+
+# Compiled PHP extensions
+*.so
+*.o
+*.lo
+*.la
+*.dep
+.libs/
+.deps/
+modules/
+dist/
+
+# Generated PHP build files
+autom4te.cache/
+build/
+Makefile
+Makefile.fragments
+Makefile.objects
+config.h
+config.log
+config.status
+config.nice
+libtool
+configure
+configure~
+aclocal.m4
+run-tests.php
+
+# Local editor files
+.freebuff/
+.idea/
+.vscode/
+
+# Local SAP integration tests (pending .env migration)
+test_sap_connection.php
+test_sap_rfc.php
+test_sap_read_table.php
